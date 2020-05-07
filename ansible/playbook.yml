@@ -1,0 +1,7 @@
+---
+- hosts: dhcpserver
+  gather_facts: yes
+  tasks:
+  # Roles to execute
+  - include_role:
+      name: "dhcp"

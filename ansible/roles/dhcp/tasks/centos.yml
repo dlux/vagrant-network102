@@ -1,0 +1,107 @@
+- name: set interface static ip address
+  debug: 
+    msg: "{{ lookup('env','https_proxy') }} is an environment variable"
+
+- name: Update OS
+  become: true
+  shell: |
+      yum -y update
+  environment: "{{ proxy_env }}"
+
+- name: Install packages - centos 7
+  become: true
+  yum:
+    name:
+      - https://dl.fedoraproject.org/pub/epel/7/x86_64/Packages/e/epel-release-7-12.noarch.rpm
+      - dhcp
+      - gcc
+    state: present
+  environment: "{{ proxy_env }}"
+
+- name: get sipcalc source
+  get_url:
+    url: http://www.routemeister.net/projects/sipcalc/files/sipcalc-1.1.6.tar.gz
+    dest: /tmp
+  environment: "{{ proxy_env }}"
+
+- name: build sipcalc
+  shell: |
+    cd /tmp
+    tar -xzvf sipcalc-1.1.6.tar.gz
+    cd sipcalc-1.1.6
+    ./configure && make
+    sudo cp src/sipcalc /usr/sbin/
+  environment: "{{ proxy_env }}"
+
+- name: construct dhcpd.conf file
+  become: true
+  file:
+    path: /etc/dhcp/dhcpd.conf
+    owner: root
+    group: root
+    mode: '0644'
+    state: touch
+ 
+- name: set global parameters
+  become: true
+  blockinfile:
+    path: /etc/dhcp/dhcpd.conf
+    block: |
+
+      # DHCP server behavior
+      ddns-update-style {{ global_ddns_update_stype }};
+      default-lease-time {{ global_default_lease_time }};
+      max-lease-time  {{ global_max_lease_time }};
+      {{ 'authoritative;' if global_authoritative }}
+      {{ 'log-facility local7;' if global_syslog }}
+      # DHCP options - extra capability
+      option domain-name "{{ global_domain_name }}";
+    insertafter: EOF
+    marker: "# {mark} GLOBAL PARAMETERS"
+
+- name: set dhcp.log for syslog
+  become: true
+  blockinfile:
+    path: /etc/rsyslog.conf
+    block: |
+      # Save dhcp messages also to dhcp.log
+      local7.*                   /var/log/dhcp.log
+    insertbefore: 'begin.forwarding.rule'
+  when: "{{ global_syslog }}"
+
+- name: calculate dhcp network
+  shell: sipcalc "{{ ip }}/{{ cidr }}" | grep 'Network.address' | awk '{print $4}'
+  register: network
+  
+- name: calculate dhcp netmask
+  shell: sipcalc "{{ ip }}/{{ cidr }}" | grep 'Network.mask' | head -1 | awk '{print $4}'
+  register: netmask
+
+- name: calculate dhcp Broadcast address
+  shell: sipcalc "{{ ip }}/{{ cidr }}" | grep 'Broadcast.address' | awk '{print $4}'
+  register: broadcast
+
+- name: calculate dhcp ip range
+  shell: sipcalc "{{ ip }}/{{ cidr }}" | grep 'Usable.range' | awk '{print $4  "  "  $6}'
+  register: range
+
+- name: set subnet on config file
+  become: true
+  blockinfile:
+    path: /etc/dhcp/dhcpd.conf
+    block: |
+      subnet  {{ network.stdout }} netmask {{ netmask.stdout }} {
+         option subnet-mask {{ netmask.stdout }};
+         option broadcast-address {{ broadcast.stdout }};
+         option routers {{ ip }};
+         range {{ range.stdout }};
+      }
+    insertafter: EOF
+    marker: "# {mark} SUBNET DEFINITION"
+
+- name: start dhcpd service
+  service:
+    name: dhcpd
+    state: started
+    enabled: yes
+

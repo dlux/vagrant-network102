@@ -1,0 +1,30 @@
+---
+
+- name: get network address
+  shell: ipcalc -m {{ ip }}/{{ cidr }}
+  register: netmask
+
+- name: create ifcfg file for {{ interface }}
+  become: true
+  file:
+    path: "/etc/sysconfig/network-scripts/ifcfg-{{ interface }}"
+    owner: root
+    group: root
+    mode: '0644'
+    state: touch
+
+- name: set ifcfg content
+  become: true
+  blockinfile:
+    path: "/etc/sysconfig/network-scripts/ifcfg-{{ interface }}"
+    block: |
+      DEVICE={{ interface }}
+      BOOTPROTO={{ mode }}
+      TYPE=Ethernet
+      ONBOOT=yes
+      {{ "IPADDR=$ip" if mode == 'static' }}
+      {{ netmask if mode == 'static' }}
+
+- name: restart {{ interface }} device
+  shell: ifdown {{ interface }} && ifup {{ interface }}
+

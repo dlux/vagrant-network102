@@ -1,0 +1,18 @@
+- name: set proxy variable
+  set_fact:
+    proxy_env:
+      http_proxy: "{{ lookup('env','http_proxy') }}"
+      https_proxy: "{{ lookup('env','https_proxy') }}"
+      no_proxy: "{{ lookup('env','no_proxy') }}"
+  when: "{{ lookup('env', 'http_proxy') != '' }}"
+
+- name: set empty proxy variable
+  set_fact:
+    proxy_env: ""
+  when: "{{ lookup('env', 'http_proxy') == '' }}"
+
+- include_tasks: centos.yml
+  when: ansible_facts['os_family'] == "RedHat"
+
+- include_tasks: ubuntu.yml
+  when: ansible_facts['os_family'] == "Debian"

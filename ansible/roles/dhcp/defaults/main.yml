@@ -1,0 +1,11 @@
+---
+global_ddns_update_stype: none
+global_default_lease_time: 172800 # 48hrs 
+global_max_lease_time: 432000  # 5 days
+global_authoritative: true
+global_syslog: true
+
+global_domain_name: "dlux.com"
+global_domain_name_servers:
+  - 8.8.8.8
+  - 8.8.4.4
