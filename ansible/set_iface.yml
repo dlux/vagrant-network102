@@ -3,8 +3,8 @@
   gather_facts: yes
   tasks:
   - set_fact:
-      mode: "{{ 'static' if ip_add is defined else 'dhcp' }}" 
-  - include_task: "centos_iface.yml"
+      mode: "{{ 'static' if ip is defined else 'dhcp' }}" 
+  - include_tasks: tasks/centos_iface.yml
     when: ansible_facts['os_family'] == "RedHat"
-  - include_task: "ubuntu_iface.yml"
+  - include_tasks: tasks/ubuntu_iface.yml
     when: ansible_facts['os_family'] == "Debian" and ansible_facts['distribution_major_version'] >= "18"

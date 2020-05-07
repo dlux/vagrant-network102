@@ -3,6 +3,13 @@
 - name: get network address
   shell: ipcalc -m {{ ip }}/{{ cidr }}
   register: netmask
+  when: "{{ ip is defined}}"
+
+- name: Remove file if it exists
+  become: true
+  file:
+    path: "/etc/sysconfig/network-scripts/ifcfg-{{ interface }}"
+    state: absent
 
 - name: create ifcfg file for {{ interface }}
   become: true
@@ -22,8 +29,8 @@
       BOOTPROTO={{ mode }}
       TYPE=Ethernet
       ONBOOT=yes
-      {{ "IPADDR=$ip" if mode == 'static' }}
-      {{ netmask if mode == 'static' }}
+      {{ 'IPADDR='+ip if mode == 'static' }}
+      {{ netmask.stdout if mode == 'static' }}
 
 - name: restart {{ interface }} device
   shell: ifdown {{ interface }} && ifup {{ interface }}
